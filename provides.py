@@ -10,8 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-
 from charmhelpers.core import hookenv
 from charms.reactive import hook
 from charms.reactive import RelationBase
@@ -57,16 +55,9 @@ class ZeppelinProvides(RelationBase):
         notebooks = []
         for conv in self.conversations():
             batch = conv.get_local(key, [])
-            notebooks.extend(conv.get_remote('notebook-{}'.format(notebook_id))
-                             for notebook_id in batch)
+            notebooks.extend(conv.get_remote('notebook-{}'.format(notebook))
+                             for notebook in batch)
         return notebooks
-
-    def registered_notebooks(self):
-        """
-        Returns a list containing all of the registered notebooks, as JSON
-        strings.
-        """
-        return self._notebooks('registered-notebooks')
 
     def unregistered_notebooks(self):
         """
@@ -82,31 +73,19 @@ class ZeppelinProvides(RelationBase):
         """
         self._notebooks('removed-notebooks')
 
-    def register_notebooks(self, notebooks):
+    def notebooks_registered(self):
         """
-        Acknowledge that the given notebooks have been registered.
+        Acknowledge that the pending notebooks have been registered.
         """
-        notebook_ids = {json.loads(notebook)['id']
-                        for notebook in notebooks}
         for conv in self.conversations():
-            registered = set(conv.get_local('registered-notebooks', []))
-            registered.update(notebooks)
-            conv.set_local('registered-notebooks', list(registered))
-            unregistered = set(conv.get_local('unregistered-notebooks', []))
-            unregistered.difference_update(notebook_ids)
-            conv.set_local('unregistered-notebooks', list(unregistered))
+            registered = conv.get_local('registered-notebooks', [])
+            unregistered = conv.get_local('unregistered-notebooks', [])
+            conv.set_local('registered-notebooks', registered + unregistered)
+            conv.set_local('unregistered-notebooks', [])
 
-    def remove_notebooks(self, notebooks):
+    def notebooks_removed(self):
         """
-        Acknowledge that the given notebooks have been removed.
+        Acknowledge that all registered notebooks have been removed.
         """
-        notebook_ids = {json.loads(notebook)['id']
-                        for notebook in notebooks}
         for conv in self.conversations():
-            registered = set(conv.get_local('registered-notebooks', []))
-            registered.difference_update(notebook_ids)
-            conv.set_local('registered-notebooks', registered)
-
-            removed = set(conv.get_local('removed-notebooks', []))
-            removed.difference_update(notebook_ids)
-            conv.set_local('removed-notebooks', removed)
+            conv.set_local('registered-notebooks', [])

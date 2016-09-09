@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+import hashlib
 
 from charms.reactive import hook
 from charms.reactive import RelationBase
@@ -22,11 +22,11 @@ class ZeppelinRequires(RelationBase):
 
     @hook('{requires:zeppelin}-relation-joined')
     def joined(self):
-        self.set_state('{relation_name}.connected')
+        self.set_state('{relation_name}.joined')
 
     @hook('{requires:zeppelin}-relation-departed')
     def departed(self):
-        self.remove_state('{relation_name}.connected')
+        self.remove_state('{relation_name}.joined')
 
     def register_notebook(self, filename=None, contents=None):
         """
@@ -39,5 +39,5 @@ class ZeppelinRequires(RelationBase):
         if filename:
             with open(filename) as fd:
                 contents = fd.read()
-        notebook_id = json.loads(contents)['id']
-        self.set_remote('notebook-{}'.format(notebook_id), contents)
+        notebook_md5 = hashlib.md5(contents).hexdigest()
+        self.set_remote('notebook-{}'.format(notebook_md5), contents)
