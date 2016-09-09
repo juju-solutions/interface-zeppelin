@@ -14,6 +14,14 @@ interface.  The interface layer will set the following state when appropriate:
   * `{relation_name}.joined` indicates that Apache Zeppelin is present,
     and thus a notebook can be registered with the `register_notebook` method.
 
+  * `{relation_name}.notebook.accepted` indicates that Apache Zeppelin has
+    accepted one or more of the requested notebooks.  You can get a list of
+    the accepted notebook filenames with the `accepted_notebooks` method.
+
+  * `{relation_name}.notebook.rejected` indicates that Apache Zeppelin has
+    rejected one or more of the requested notebooks.  You can get a list of
+    the rejected notebook filenames with the `rejected_notebooks` method.
+
 The `register_notebook` method can be passed either a `filename` or a `contents`
 string.
 
@@ -23,6 +31,11 @@ An example of how a charm would use this interface would be:
 @when('zeppelin.joined')
 def register_notebook(zeppelin):
     zeppelin.register_notebook(filename='files/notebook.json')
+
+
+@when('zeppelin.notebook.rejected')
+def report_rejected_notebook(zeppelin):
+    status_set('blocked', 'Zeppelin rejected our notebook')
 ```
 
 
@@ -32,34 +45,35 @@ The Zeppelin charm should `provide` this interface.  The interface layer will
 set the following states when appropriate:
 
   * `{relation_name}.notebook.registered` indicates that a client has
-    registered a notebook.  The charm would then use the `notebooks_registered`
-    method to iterate over the notebooks to be registered.
+    registered a notebook.  The charm would then iterate over the
+    `unregistered_notebooks`, handle them, and use either `accept_notebook`
+    or `reject_notebook` methods to acknowledge them.
 
   * `{relation_name}.notebook.removed` indicates that a client has
     disconnected and so its notebooks should be removed.  The charm would
-    then use the `notebooks_removed` method to iterate over the notebooks
-    to be removed.
+    then use the `unremoved_notebooks` method to iterate over the notebooks
+    to be removed and call `remove_notebook` to acknowledge them.
 
 An example of how the Zeppelin charm would use this interface would be:
 
 ```python
 @when('zeppelin.installed', 'client.notebook.registered')
 def register_notebook(client):
-    notebooks = client.unregistered_notebooks()
     api = ZeppelinAPI()
-    for notebook in notebooks:
-        api.import_notebook(notebook)
-    client.notebooks_registered()
+    for notebook in client.unregistered_notebooks():
+        if api.import_notebook(notebook):
+            client.accept_notebook(notebook)
+        else:
+            client.reject_notebook(notebook)
 
 
 @when('zeppelin.installed', 'client.notebook.removed')
 def remove_notebook(client):
-    notebooks = client.removed_notebooks()
     api = ZeppelinAPI()
-    for notebook in notebooks:
+    for notebook in client.unremoved_notebooks():
         notebook_id = json.loads(notebook)['id']
         api.delete_notebook(notebook_id)
-    client.notebooks_removed()
+        client.remove_notebook(notebook)
 ```
 
 

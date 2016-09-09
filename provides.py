@@ -10,7 +10,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from charmhelpers.core import hookenv
+import hashlib
+import json
+
 from charms.reactive import hook
 from charms.reactive import RelationBase
 from charms.reactive import scopes
@@ -22,16 +24,12 @@ class ZeppelinProvides(RelationBase):
     @hook('{provides:zeppelin}-relation-changed')
     def changed(self):
         conv = self.conversation()
-        # get all notebooks set by the current remote unit
-        # (we have to use low-level relation API because relation data keys
-        # are not known ahead of time and reactive API doesn't support this)
-        notebooks = {key.split('-', 1)[1]
-                     for key in hookenv.relation_get().keys()
-                     if key.startswith('notebook-')}
-        registered = set(conv.get_local('registered', []))
-        unregistered = notebooks - registered
+        requested = set(json.loads(conv.get_remote('requested-notebooks',
+                                                   '[]')))
+        registered = set(conv.get_local('registered-notebooks', []))
+        unregistered = requested - registered
         if unregistered:
-            conv.set_local('unregistered', list(unregistered))
+            conv.set_local('unregistered-notebooks', list(unregistered))
             conv.set_state('{relation_name}.notebook.registered')
 
     @hook('{provides:zeppelin}-relation-departed')
@@ -39,14 +37,9 @@ class ZeppelinProvides(RelationBase):
         conv = self.conversation()
         if len(conv.units) == 1:  # last unit leaving
             # get all notebooks set by the current remote unit
-            # (we have to use the low-level relation API here because
-            # relation data keys are not known ahead of time and reactive
-            # API doesn't support this)
-            notebooks = {key.split('-', 1)[1]
-                         for key in hookenv.relation_get().keys()
-                         if key.startswith('notebook-')}
             # remove all notebooks for this service
-            removed = set(conv.get_local('removed-notebooks', [])) & notebooks
+            registered = set(conv.get_local('registered-notebooks', []))
+            removed = set(conv.get_local('removed-notebooks', [])) & registered
             conv.set_local('removed-notebooks', list(removed))
             conv.set_state('{relation_name}.notebook.removed')
 
@@ -60,31 +53,58 @@ class ZeppelinProvides(RelationBase):
 
     def unregistered_notebooks(self):
         """
-        Returns a list containing all of the registered notebooks, as JSON
-        strings.
+        Returns a list containing all of the notebooks pending registration,
+        as JSON strings.
         """
         self._notebooks('unregistered-notebooks')
 
-    def removed_notebooks(self):
+    def unremoved_notebooks(self):
         """
-        Returns a list containing all of the registered notebooks, as JSON
-        strings.
+        Returns a list containing all of the notebooks pending removal,
+        as JSON strings.
         """
         self._notebooks('removed-notebooks')
 
-    def notebooks_registered(self):
+    def accept_notebook(self, notebook):
         """
-        Acknowledge that the pending notebooks have been registered.
+        Acknowledge that the given pending notebook has been registered.
         """
+        notebook_md5 = hashlib.md5(notebook).hexdigest()
         for conv in self.conversations():
-            registered = conv.get_local('registered-notebooks', [])
-            unregistered = conv.get_local('unregistered-notebooks', [])
-            conv.set_local('registered-notebooks', registered + unregistered)
-            conv.set_local('unregistered-notebooks', [])
+            registered = set(conv.get_local('registered-notebooks', []))
+            unregistered = set(conv.get_local('unregistered-notebooks', []))
+            if notebook_md5 in unregistered:
+                registered.add(notebook_md5)
+                conv.set_local('registered-notebooks', list(registered))
+                conv.set_remote('accepted-notebooks',
+                                json.dumps(list(registered)))
 
-    def notebooks_removed(self):
+                unregistered.discard(notebook_md5)
+                conv.set_local('unregistered-notebooks', list(unregistered))
+
+    def reject_notebook(self, notebook):
         """
-        Acknowledge that all registered notebooks have been removed.
+        Inform the client that the given pending notebook has been rejected.
         """
+        notebook_md5 = hashlib.md5(notebook).hexdigest()
         for conv in self.conversations():
-            conv.set_local('registered-notebooks', [])
+            rejected = set(conv.get_local('rejected-notebooks', []))
+            unregistered = set(conv.get_local('unregistered-notebooks', []))
+            if notebook_md5 in unregistered:
+                rejected.add(notebook_md5)
+                conv.set_local('rejected-notebooks', list(rejected))
+                conv.set_remote('rejected-notebooks',
+                                json.dumps(list(rejected)))
+
+                unregistered.discard(notebook_md5)
+                conv.set_local('unregistered-notebooks', list(unregistered))
+
+    def remove_notebook(self, notebook):
+        """
+        Acknowledge that the given registered notebook has been removed.
+        """
+        notebook_md5 = hashlib.md5(notebook).hexdigest()
+        for conv in self.conversations():
+            registered = set(conv.get_local('registered-notebooks', []))
+            registered.discard(notebook_md5)
+            conv.set_local('registered-notebooks', list(registered))

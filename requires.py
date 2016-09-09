@@ -11,6 +11,7 @@
 # limitations under the License.
 
 import hashlib
+import json
 
 from charms.reactive import hook
 from charms.reactive import RelationBase
@@ -24,11 +25,20 @@ class ZeppelinRequires(RelationBase):
     def joined(self):
         self.set_state('{relation_name}.joined')
 
+    @hook('{requires:zeppelin}-relation-changed')
+    def changed(self):
+        accepted = json.loads(self.get_remote('accepted-notebooks', '[]'))
+        rejected = json.loads(self.get_remote('rejected-notebooks', '[]'))
+        self.toggle_state('{relation_name}.notebook.accepted', bool(accepted))
+        self.toggle_state('{relation_name}.notebook.rejected', bool(rejected))
+
     @hook('{requires:zeppelin}-relation-departed')
     def departed(self):
         self.remove_state('{relation_name}.joined')
+        self.remove_state('{relation_name}.notebook.accepted')
+        self.remove_state('{relation_name}.notebook.rejected')
 
-    def register_notebook(self, filename=None, contents=None):
+    def register_notebook(self, filename):
         """
         Register a notebook with Apache Zeppelin.
 
@@ -36,8 +46,29 @@ class ZeppelinRequires(RelationBase):
         be read from that file.  Otherwise, the `contents` parameter
         will be used.
         """
-        if filename:
-            with open(filename) as fd:
-                contents = fd.read()
+        with open(filename) as fd:
+            contents = fd.read()
         notebook_md5 = hashlib.md5(contents).hexdigest()
-        self.set_remote('notebook-{}'.format(notebook_md5), contents)
+        requested = self.get_local('requested-notebooks', {})
+        requested[notebook_md5] = filename
+        self.set_local('requested-notebooks', requested)
+        self.set_remote(data={
+            'requested-notebooks': json.dumps(requested.keys()),
+            'notebook-{}'.format(notebook_md5): contents,
+        })
+
+    def accepted_notebooks(self):
+        """
+        Return a list of all notebook filenames that were accepted by Zeppelin.
+        """
+        requested = self.get_local('requested-notebooks', {})
+        accepted = json.loads(self.get_remote('accepted-notebooks', '[]'))
+        return [v for k, v in requested.items() if k in accepted]
+
+    def rejected_notebooks(self):
+        """
+        Return a list of all notebook filenames that were rejected by Zeppelin.
+        """
+        requested = self.get_local('requested-notebooks', {})
+        rejected = json.loads(self.get_remote('rejected-notebooks', '[]'))
+        return [v for k, v in requested.items() if k in rejected]
