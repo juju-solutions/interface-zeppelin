@@ -32,12 +32,12 @@ The Zeppelin charm should `provide` this interface.  The interface layer will
 set the following states when appropriate:
 
   * `{relation_name}.notebook.registered` indicates that a client has
-    registered a notebook.  The charm would then use the `unregistered_notebooks`
+    registered a notebook.  The charm would then use the `notebooks_registred`
     method to iterate over the notebooks to be registered.
 
-  * `{relation_name}.notebook.registered` indicates that a client has
+  * `{relation_name}.notebook.removed` indicates that a client has
     disconnected and so its notebooks should be removed.  The charm would
-    then use the `removed_notebooks` method to iterate over the notebooks
+    then use the `notebooks_removed` method to iterate over the notebooks
     to be removed.
 
 An example of how the Zeppelin charm would use this interface would be:
