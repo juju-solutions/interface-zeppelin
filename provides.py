@@ -22,7 +22,6 @@ class ZeppelinProvides(RelationBase):
     @hook('{provides:zeppelin}-relation-changed')
     def changed(self):
         conv = self.conversation()
-        notebooks = self._notebooks()
         # get all notebooks set by the current remote unit
         # (we have to use low-level relation API because relation data keys
         # are not known ahead of time and reactive API doesn't support this)
