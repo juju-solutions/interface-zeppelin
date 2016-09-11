@@ -48,7 +48,7 @@ class ZeppelinRequires(RelationBase):
         """
         with open(filename) as fd:
             contents = fd.read()
-        notebook_md5 = hashlib.md5(contents).hexdigest()
+        notebook_md5 = hashlib.md5(contents.encode('utf8')).hexdigest()
         requested = self.get_local('requested-notebooks', {})
         requested[notebook_md5] = filename
         self.set_local('requested-notebooks', requested)

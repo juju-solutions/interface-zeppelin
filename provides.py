@@ -56,20 +56,20 @@ class ZeppelinProvides(RelationBase):
         Returns a list containing all of the notebooks pending registration,
         as JSON strings.
         """
-        self._notebooks('unregistered-notebooks')
+        return self._notebooks('unregistered-notebooks')
 
     def unremoved_notebooks(self):
         """
         Returns a list containing all of the notebooks pending removal,
         as JSON strings.
         """
-        self._notebooks('removed-notebooks')
+        return self._notebooks('removed-notebooks')
 
     def accept_notebook(self, notebook):
         """
         Acknowledge that the given pending notebook has been registered.
         """
-        notebook_md5 = hashlib.md5(notebook).hexdigest()
+        notebook_md5 = hashlib.md5(notebook.encode('utf8')).hexdigest()
         for conv in self.conversations():
             registered = set(conv.get_local('registered-notebooks', []))
             unregistered = set(conv.get_local('unregistered-notebooks', []))
@@ -86,7 +86,7 @@ class ZeppelinProvides(RelationBase):
         """
         Inform the client that the given pending notebook has been rejected.
         """
-        notebook_md5 = hashlib.md5(notebook).hexdigest()
+        notebook_md5 = hashlib.md5(notebook.encode('utf8')).hexdigest()
         for conv in self.conversations():
             rejected = set(conv.get_local('rejected-notebooks', []))
             unregistered = set(conv.get_local('unregistered-notebooks', []))
@@ -103,7 +103,7 @@ class ZeppelinProvides(RelationBase):
         """
         Acknowledge that the given registered notebook has been removed.
         """
-        notebook_md5 = hashlib.md5(notebook).hexdigest()
+        notebook_md5 = hashlib.md5(notebook.encode('utf8')).hexdigest()
         for conv in self.conversations():
             registered = set(conv.get_local('registered-notebooks', []))
             registered.discard(notebook_md5)
