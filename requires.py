@@ -53,7 +53,7 @@ class ZeppelinRequires(RelationBase):
         requested[notebook_md5] = filename
         self.set_local('requested-notebooks', requested)
         self.set_remote(data={
-            'requested-notebooks': json.dumps(requested.keys()),
+            'requested-notebooks': json.dumps(list(requested.keys())),
             'notebook-{}'.format(notebook_md5): contents,
         })
 
