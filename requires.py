@@ -78,30 +78,18 @@ class ZeppelinRequires(RelationBase):
         rejected = json.loads(self.get_remote('rejected-notebooks', '[]'))
         return [v for k, v in requested.items() if k in rejected]
 
-    def modify_interpreter(self, interpreter_name,
-                           properties=None, options=None, interpreter_group=None):
+    def modify_interpreter(self, interpreter_name, properties):
         """
         Request a modification of an interpreter.
 
         :param str interpreter_name: The name of the interpreter to modify.
-        :param dict properties: Optional mapping of new properties to add, or
+        :param dict properties: Mapping of new properties to add, or
             existing properties to modify.  Existing properties that aren't
             mentioned will be left unchanged.
-        :param dict options: Optional mapping of new options to add, or
-            existing options to modify.  Existing options that aren't
-            mentioned will be left unchanged.
-        :param list interpreter_group: Optional list of interpreters to add to
-            the group or to modify.  Each item of the list should be a dict
-            with two keys, both of which should have string values: `name`
-            and `class`.  If an interpreter with that name is already present
-            in the group, it will be updated.  Otherwise, a new interpreter
-            will be added to the group.
         """
         change = {
             'name': interpreter_name,
             'properties': properties or {},
-            'options': options or {},
-            'interpreter_group': interpreter_group or [],
         }
         change_json = json.dumps(change)
         change_md5 = hashlib.md5(change_json.encode('utf8')).hexdigest()

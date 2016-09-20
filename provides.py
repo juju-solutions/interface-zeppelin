@@ -123,10 +123,8 @@ class ZeppelinProvides(RelationBase):
         """
         Returns a list containing all of the pending interpreter change requests.
 
-        Each change request will be a dict with the keys: name, properties,
-        options, and interpreter_group.  Both properties and options will be
-        dicts mapping keys to values, and interpreter_group will be a list
-        containing dicts with name and class items.
+        Each change request will be a dict with the keys: name, properties.
+        The properties will be a dict mapping keys to values.
         """
         changes = []
         for conv in self.conversations():
@@ -136,8 +134,6 @@ class ZeppelinProvides(RelationBase):
                 changes.append({
                     'name': change['name'],
                     'properties': change.get('properties') or {},
-                    'options': change.get('options') or {},
-                    'interpreter_group': change.get('interpreter_group') or [],
                 })
         return changes
 
