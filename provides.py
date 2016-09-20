@@ -24,13 +24,19 @@ class ZeppelinProvides(RelationBase):
     @hook('{provides:zeppelin}-relation-changed')
     def changed(self):
         conv = self.conversation()
-        requested = set(json.loads(conv.get_remote('requested-notebooks',
-                                                   '[]')))
+        requested = set(json.loads(conv.get_remote('requested-notebooks', '[]')))
         registered = set(conv.get_local('registered-notebooks', []))
         unregistered = requested - registered
         if unregistered:
             conv.set_local('unregistered-notebooks', list(unregistered))
             conv.set_state('{relation_name}.notebook.registered')
+
+        changes = set(json.loads(conv.get_remote('requested-interpreter-changes', '[]')))
+        processed = set(conv.get_local('processed-interpreter-changes', []))
+        pending = changes - processed
+        if unregistered:
+            conv.set_local('pending-interpreter-changes', list(pending))
+            conv.set_state('{relation_name}.interpreter.change')
 
     @hook('{provides:zeppelin}-relation-departed')
     def departed(self):
@@ -81,6 +87,8 @@ class ZeppelinProvides(RelationBase):
 
                 unregistered.discard(notebook_md5)
                 conv.set_local('unregistered-notebooks', list(unregistered))
+                if not unregistered:
+                    conv.remove_state('{relation_name}.notebook.registered')
 
     def reject_notebook(self, notebook):
         """
@@ -98,6 +106,8 @@ class ZeppelinProvides(RelationBase):
 
                 unregistered.discard(notebook_md5)
                 conv.set_local('unregistered-notebooks', list(unregistered))
+                if not unregistered:
+                    conv.remove_state('{relation_name}.notebook.registered')
 
     def remove_notebook(self, notebook):
         """
@@ -108,3 +118,59 @@ class ZeppelinProvides(RelationBase):
             registered = set(conv.get_local('registered-notebooks', []))
             registered.discard(notebook_md5)
             conv.set_local('registered-notebooks', list(registered))
+
+    def interpreter_changes(self):
+        """
+        Returns a list containing all of the pending interpreter change requests.
+
+        Each change request will be a dict with the keys: name, properties.
+        The properties will be a dict mapping keys to values.
+        """
+        changes = []
+        for conv in self.conversations():
+            batch = conv.get_local('pending-interpreter-changes', [])
+            for change_id in batch:
+                change = json.loads(conv.get_remote('interpreter-change-{}'.format(change_id)))
+                changes.append({
+                    'name': change['name'],
+                    'properties': change.get('properties') or {},
+                })
+        return changes
+
+    def accept_interpreter_change(self, change):
+        """
+        Acknowledge that the given pending interpreter change has been processed.
+        """
+        change_md5 = hashlib.md5(json.dumps(change).encode('utf8')).hexdigest()
+        for conv in self.conversations():
+            processed = set(conv.get_local('processed-interpreter-changes', []))
+            pending = set(conv.get_local('pending-interpreter-changes', []))
+            if change_md5 in pending:
+                processed.add(change_md5)
+                conv.set_local('processed-interpreter-changes', list(registered))
+                conv.set_remote('accepted-interpreter-changes',
+                                json.dumps(list(processed)))
+
+                pending.discard(change_md5)
+                conv.set_local('pending-interpreter-changes', list(pending))
+                if not pending:
+                    conv.remove_state('{relation_name}.interpreter.change')
+
+    def reject_interpreter_change(self, change):
+        """
+        Inform the client that the given pending interpreter change has been rejected.
+        """
+        change_md5 = hashlib.md5(json.dumps(change).encode('utf8')).hexdigest()
+        for conv in self.conversations():
+            rejected = set(conv.get_local('rejected-interpreter-changes', []))
+            pending = set(conv.get_local('pending-interpreter-changes', []))
+            if change_md5 in unregistered:
+                rejected.add(change_md5)
+                conv.set_local('rejected-interpreter-changes', list(rejected))
+                conv.set_remote('rejected-interpreter-changes',
+                                json.dumps(list(rejected)))
+
+                pending.discard(change_md5)
+                conv.set_local('pending-interpreter-changes', list(unregistered))
+                if not pending:
+                    conv.remove_state('{relation_name}.interpreter.change')
